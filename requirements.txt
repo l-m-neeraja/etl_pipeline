@@ -1,0 +1,5 @@
+apache-airflow==2.8.1
+psycopg2-binary
+pandas
+python-dotenv
+pytest
