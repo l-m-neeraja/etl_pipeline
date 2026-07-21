@@ -1,5 +1,7 @@
 apache-airflow==2.8.1
-psycopg2-binary
+mysql-connector-python
+cryptography
 pandas
 python-dotenv
 pytest
+apache-airflow-providers-mysql

@@ -1,59 +1,39 @@
--- Create Schemas
-CREATE SCHEMA IF NOT EXISTS staging;
-CREATE SCHEMA IF NOT EXISTS quarantine;
+CREATE DATABASE IF NOT EXISTS ecommerce_data;
+USE ecommerce_data;
 
 -- Staging Table
-CREATE TABLE IF NOT EXISTS staging.transactions (
-    transaction_id VARCHAR(50) PRIMARY KEY,
-    customer_id VARCHAR(50) NOT NULL,
-    product_id VARCHAR(50) NOT NULL,
-    amount NUMERIC(10, 2) NOT NULL,
-    transaction_date DATE NOT NULL,
-    status VARCHAR(20) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+CREATE TABLE IF NOT EXISTS raw_orders (
+    order_id VARCHAR(255) PRIMARY KEY,
+    customer_id VARCHAR(255),
+    product_name TEXT,
+    item_price DECIMAL(10, 2),
+    quantity INT,
+    order_date DATETIME,
+    load_timestamp DATETIME
 );
 
--- Fact Table
-CREATE TABLE IF NOT EXISTS public.fact_transactions (
-    transaction_id VARCHAR(50) NOT NULL,
-    customer_id VARCHAR(50) NOT NULL,
-    product_id VARCHAR(50) NOT NULL,
-    amount NUMERIC(10, 2) NOT NULL,
-    transaction_date DATE NOT NULL,
-    status VARCHAR(20) NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    PRIMARY KEY (transaction_id, transaction_date)
-) PARTITION BY RANGE (transaction_date);
-
-
--- Example Partition (2026 Jan)
-CREATE TABLE IF NOT EXISTS public.fact_transactions_y2026m01
-PARTITION OF public.fact_transactions
-FOR VALUES FROM ('2026-01-01') TO ('2026-02-01');
+-- Analytics Fact Table
+CREATE TABLE IF NOT EXISTS fact_orders (
+    order_sk INT AUTO_INCREMENT PRIMARY KEY,
+    order_id VARCHAR(255) UNIQUE,
+    customer_id VARCHAR(255),
+    product_name TEXT,
+    total_order_value DECIMAL(10, 2),
+    order_date DATETIME,
+    processed_timestamp DATETIME
+);
 
 -- Quarantine Table
-CREATE TABLE IF NOT EXISTS quarantine.transactions_errors (
-    error_id SERIAL PRIMARY KEY,
-    transaction_id VARCHAR(50),
-    customer_id VARCHAR(50),
-    product_id VARCHAR(50),
-    amount NUMERIC(10, 2),
-    transaction_date DATE,
-    status VARCHAR(20),
-    updated_at TIMESTAMP WITH TIME ZONE,
-    error_message TEXT NOT NULL,
-    error_timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS error_records (
+    error_id INT AUTO_INCREMENT PRIMARY KEY,
+    source_data JSON,
+    error_message TEXT,
+    detected_at DATETIME
 );
 
--- Products Dimension
-CREATE TABLE IF NOT EXISTS public.products (
-    product_id VARCHAR(50) PRIMARY KEY,
-    product_name VARCHAR(255) NOT NULL
+-- Processed Files Tracking
+CREATE TABLE IF NOT EXISTS processed_files (
+    file_name VARCHAR(255) PRIMARY KEY,
+    ingested_at DATETIME
 );
 
--- Indexes
-CREATE INDEX IF NOT EXISTS idx_fact_transaction_date
-ON public.fact_transactions (transaction_date);
-
-CREATE INDEX IF NOT EXISTS idx_fact_customer_id
-ON public.fact_transactions (customer_id);

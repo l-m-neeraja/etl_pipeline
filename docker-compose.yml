@@ -2,7 +2,9 @@ version: '3.8'
 
 x-airflow-common:
   &airflow-common
-  build: .
+  build:
+    context: .
+    dockerfile: Dockerfile.etl
   env_file:
     - .env
   environment:
@@ -11,15 +13,19 @@ x-airflow-common:
     AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'True'
+    AIRFLOW_CONN_MYSQL_ECOMMERCE_DATA: ${AIRFLOW_CONN_MYSQL_ECOMMERCE_DATA}
+    PYTHONPATH: /opt/airflow
   volumes:
     - ./dags:/opt/airflow/dags
-    - ./scripts:/opt/airflow/scripts
+    - ./etl_scripts:/opt/airflow/etl_scripts
     - ./sql:/opt/airflow/sql
     - ./data:/opt/airflow/data
     - airflow_logs:/opt/airflow/logs
   depends_on:
-    - airflow-db
-    - warehouse-db
+    airflow-db:
+      condition: service_healthy
+    mysql_db:
+      condition: service_healthy
 
 services:
 
@@ -36,20 +42,34 @@ services:
       - airflow_db_data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
-  warehouse-db:
-    image: postgres:15
-    container_name: warehouse-db
+  mysql_db:
+    image: mysql:8.0
+    container_name: mysql_db
     env_file:
       - .env
     environment:
-      POSTGRES_USER: ${WAREHOUSE_USER}
-      POSTGRES_PASSWORD: ${WAREHOUSE_PASSWORD}
-      POSTGRES_DB: ${WAREHOUSE_DB}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     volumes:
-      - warehouse_db_data:/var/lib/postgresql/data
+      - mysql_db_data:/var/lib/mysql
+      - ./sql/create_tables.sql:/docker-entrypoint-initdb.d/create_tables.sql
     ports:
-      - "5434:5432"
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   airflow-init:
     <<: *airflow-common
@@ -83,5 +103,6 @@ services:
 
 volumes:
   airflow_db_data:
-  warehouse_db_data:
+  mysql_db_data:
   airflow_logs:
+
